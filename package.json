@@ -1,0 +1,25 @@
+{
+  "name": "lifty",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @lifty/api start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @lifty/api db:migrate",
+    "db:deploy": "pnpm --filter @lifty/api exec prisma migrate deploy",
+    "db:seed": "pnpm --filter @lifty/api db:seed",
+    "backup": "pnpm --filter @lifty/api backup"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.4",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.3"
+  }
+}
