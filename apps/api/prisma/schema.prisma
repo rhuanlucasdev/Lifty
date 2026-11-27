@@ -1,0 +1,147 @@
+// Modelo de dados do Lifty (referência: docs do projeto replog).
+// Valores de domínio (grupo muscular, equipamento, tipo, sexo) são strings
+// validadas pelos schemas Zod de @lifty/shared.
+// Recordes, XP, nível, conquistas e streak são derivados das séries (D4).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  name       String
+  birthDate  String? // YYYY-MM-DD
+  sex        String?
+  heightCm   Int?
+  weeklyGoal Int      @default(3)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  bodyWeights BodyWeightEntry[]
+  exercises   Exercise[]
+  plans       WorkoutPlan[]
+  sessions    WorkoutSession[]
+}
+
+model BodyWeightEntry {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  weightKg   Float
+  measuredOn String // YYYY-MM-DD
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, measuredOn])
+}
+
+model Exercise {
+  id               Int       @id @default(autoincrement())
+  userId           Int? // null = exercício do sistema (seed)
+  name             String
+  primaryMuscle    String
+  secondaryMuscles Json // MuscleGroup[]
+  equipment        String
+  type             String
+  description      String    @default("")
+  instructions     String    @default("")
+  mediaUrl         String?
+  archivedAt       DateTime? // D6: exercício usado é arquivado, não apagado
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user         User?                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planItems    WorkoutPlanExercise[]
+  sessionItems WorkoutSessionExercise[]
+}
+
+model WorkoutPlan {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String
+  description String   @default("")
+  color       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises WorkoutPlanExercise[]
+  sessions  WorkoutSession[]
+}
+
+model WorkoutPlanExercise {
+  id          Int    @id @default(autoincrement())
+  planId      Int
+  exerciseId  Int
+  position    Int
+  sets        Int
+  repMin      Int
+  repMax      Int
+  restSeconds Int
+  notes       String @default("")
+
+  plan     WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercise Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, position])
+  @@index([exerciseId])
+}
+
+// Sessão em andamento: finishedAt nulo. Pausada: pausedAt preenchido.
+// Índice único parcial (migration) garante uma única sessão em andamento por usuário.
+model WorkoutSession {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  planId        Int?
+  planSnapshot  Json // PlanSnapshot
+  startedAt     DateTime  @default(now())
+  pausedAt      DateTime?
+  pausedSeconds Int       @default(0)
+  finishedAt    DateTime?
+  localDate     String // YYYY-MM-DD em America/Sao_Paulo, do início da sessão
+  notes         String    @default("")
+
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      WorkoutPlan?             @relation(fields: [planId], references: [id], onDelete: SetNull)
+  exercises WorkoutSessionExercise[]
+
+  @@index([userId, localDate])
+}
+
+model WorkoutSessionExercise {
+  id         Int  @id @default(autoincrement())
+  sessionId  Int
+  exerciseId Int
+  position   Int
+  snapshot   Json // SessionExerciseSnapshot
+
+  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets     WorkoutSet[]
+
+  @@index([sessionId])
+  @@index([exerciseId])
+}
+
+model WorkoutSet {
+  id                Int       @id @default(autoincrement())
+  sessionExerciseId Int
+  setNumber         Int
+  loadKg            Float?
+  reps              Int?
+  rpe               Float?
+  isWarmup          Boolean   @default(false)
+  notes             String    @default("")
+  completedAt       DateTime? // null = pendente
+
+  sessionExercise WorkoutSessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([sessionExerciseId])
+}
